@@ -4,8 +4,9 @@
 package main
 
 import (
+	"cmp"
+	"errors"
 	"fmt"
-	"golang.org/x/exp/constraints"
 	"math"
 	"math/rand"
 	"os"
@@ -24,6 +25,7 @@ type Parameters struct {
 	MatingK      int
 	NumGenes     int
 	MutationRate float64
+	Compatible   bool
 	MateSelf     bool
 	MateSibling  bool
 	MateCousin   bool
@@ -42,11 +44,12 @@ func NewParameters() Parameters {
 		MatingK:      50,
 		NumGenes:     10,
 		MutationRate: 0.0,
+		Compatible:   true,
 		MateSelf:     false,
 		MateSibling:  false,
 		MateCousin:   false,
 		MateSameSex:  false,
-		Analysis:     "NCDG",
+		Analysis:     "NCDGg",
 	}
 }
 
@@ -77,10 +80,7 @@ type Agent struct {
 
 // Checks if two agents share a mother or father in which case they are siblings.
 func isSibling(a, b *Agent) bool {
-	if a.generation == 0 {
-		return false
-	}
-	return a.mother == b.mother || a.father == b.father
+	return a.generation > 0 && (a.mother == b.mother || a.father == b.father)
 }
 
 // Check if two agents share a grandparent in which case they are cousins.
@@ -107,7 +107,7 @@ func setAncestors(agents []Agent, id int) {
 	for sp < len(ancestorVec) {
 		curr := ancestorVec[sp]
 		currGen := agents[curr].generation
-		if currGen < 1 { // The zero generation has no ancestry
+		if currGen == 0 { // The zero generation has no ancestry
 			break
 		}
 		mother := agents[curr].mother
@@ -130,34 +130,27 @@ func setAncestors(agents []Agent, id int) {
 	agents[id].ancestorSet = ancestorSet
 }
 
-// Generic function to count the number of common elements in two arrays
-func CountCommon[S ~[]E, E constraints.Ordered](vecA S, vecB S) int {
-	i := 0
-	j := 0
-	total := 0
+// Generic function to count the number of common elements in two ordered arrays
+func CountCommonElementsSortedArray[S ~[]E, E cmp.Ordered](vecA S, vecB S) int {
+	i, j, total := 0, 0, 0
 	for i < len(vecA) && j < len(vecB) {
-		if vecA[i] < vecB[j] {
-			for i < len(vecA) && vecA[i] <= vecB[j] {
-				if vecA[i] == vecB[j] {
-					total++
-				}
-				i++
-			}
-		} else {
-			for j < len(vecB) && vecB[j] <= vecA[i] {
-				if vecB[j] == vecA[i] {
-					total++
-				}
-				j++
-			}
+		switch {
+		case vecA[i] < vecB[j]:
+			i++
+		case vecA[i] > vecB[j]:
+			j++
+		default:
+			total++
+			i++
+			j++
 		}
 	}
 	return total
 }
 
-// Calculates the number of generations back you need to go to find
-// a common ancestor between two agents. Maximum value is generation of
-// first agent.
+// Calculates the number of generations back you need to go to find a common
+// ancestor between two agents. Maximum value is last generation.
+
 func generationDiff(agents []Agent, a *Agent, b *Agent) int {
 	generationFound := 0
 	for i := len(a.ancestorVec) - 1; i >= 0; i-- {
@@ -238,19 +231,18 @@ func NewSimulation(parameters *Parameters) *Simulation {
 
 // Checks if two agents are compatible for mating
 func (s *Simulation) compatible(a, b *Agent) bool {
-	if s.params.MateSelf == false && a.id == b.id {
+	switch {
+	case s.params.MateSelf == false && a.id == b.id:
 		return false
-	}
-	if s.params.MateSameSex == false && a.sex == b.sex {
+	case s.params.MateSameSex == false && a.sex == b.sex:
 		return false
-	}
-	if s.params.MateSibling == false && isSibling(a, b) {
+	case s.params.MateSibling == false && isSibling(a, b):
 		return false
-	}
-	if s.params.MateCousin && isCousin(s.agents, a, b) {
+	case s.params.MateCousin && isCousin(s.agents, a, b):
 		return false
+	default:
+		return true
 	}
-	return true
 }
 
 // Fills the current_generation vector with the IDs of the given generation
@@ -355,34 +347,48 @@ func (s *Simulation) makeChildrenMonogamous(generation int) {
 }
 
 // Mating strategy in which any given agent mates with at most one other agent
-func (s *Simulation) monogamousMating(generation int) {
+func (s *Simulation) monogamousMating(generation int) error {
 	s.pairAgents()
-	if len(s.matingPairs) > 0 {
-		s.makeChildrenMonogamous(generation + 1)
-	} else {
-		fmt.Fprintln(os.Stderr, s.id, "Error: No mating pairs for generation",
-			generation)
+	if len(s.matingPairs) == 0 {
+		return fmt.Errorf("%d, Error: No mating pairs for generation %d",
+			s.id, generation)
 	}
+	s.makeChildrenMonogamous(generation)
+	return nil
 }
 
-// Mating strategy in which agents to mate are repeatedly selected to mate with anyone.
-func (s *Simulation) nonMonogamousMating(generation int) {
+// Mating strategy in which agents to mate are repeatedly selected to mate with
+// anyone but compatibility checking is done.
+func (s *Simulation) nonMonogamousMating(generation int) error {
 	iterations := int(math.Ceil(s.params.GrowthRate * float64(len(s.currGen))))
 	for range iterations {
 		i := s.currGen[rand.Intn(len(s.currGen))].id
 		var j int
 		compat := false
 		k := 0
-		for ; !compat && k < 10; k++ {
+		matingK := s.params.MatingK
+		for ; !compat && k < matingK; k++ {
 			j = s.currGen[rand.Intn(len(s.currGen))].id
 			compat = s.compatible(&s.agents[i], &s.agents[j])
 		}
-		if k >= 10 {
-			fmt.Fprintln(os.Stderr, s.id, "Can't find compatible agents for generation", generation)
-			break
+		if k >= matingK {
+			continue
 		}
 		s.agents = newChild(s.agents, i, j, s.params.NumGenes, generation, s.params.MutationRate)
 	}
+	return nil
+}
+
+// Mating strategy in which no compatibility checks are done (fastest)
+func (s *Simulation) anyMating(generation int) error {
+	iterations := int(math.Ceil(s.params.GrowthRate * float64(len(s.currGen))))
+	for range iterations {
+		i := s.currGen[rand.Intn(len(s.currGen))].id
+		j := s.currGen[rand.Intn(len(s.currGen))].id
+		s.agents = newChild(s.agents, i, j, s.params.NumGenes,
+			generation, s.params.MutationRate)
+	}
+	return nil
 }
 
 // Creates an array of integers in simulation.genBdrys where each integer is
@@ -405,30 +411,37 @@ func (s *Simulation) SetGenBdrys() {
 	s.genBdrys = append(s.genBdrys, len(s.agents))
 }
 
-// This is the simulation engine function
-func (s *Simulation) Simulate() {
-	s.setCurrGen(0)
-	for i := range s.params.Generations {
-		if len(s.currGen) == 0 {
-			fmt.Fprintln(os.Stderr, s.id, "sim-eng-err, no survivors for generation", i)
-			break
+func (s *Simulation) setPairFunc() func(int) error {
+	switch {
+	case s.params.Monogamous == false && s.params.Compatible == false:
+		return s.anyMating
+	case s.params.Monogamous == true:
+		return s.monogamousMating
+	default:
+		return s.nonMonogamousMating
+	}
+}
 
-		}
-		if len(s.currGen) == 1 {
-			fmt.Fprintln(os.Stderr, s.id, "sim-eng-err, only one survivor in generation", i)
-			break
+// This is the simulation engine function
+func (s *Simulation) Simulate() error {
+	s.setCurrGen(0)
+	pairFunc := s.setPairFunc()
+	for i := 1; i <= s.params.Generations; i++ {
+		if len(s.currGen) < 2 {
+			return fmt.Errorf("%d, sim-eng-err, insufficient survivors for generation, %d, %d",
+				s.id, len(s.currGen), i)
 		}
 		rand.Shuffle(len(s.currGen), func(x, y int) {
 			s.currGen[x], s.currGen[y] = s.currGen[y], s.currGen[x]
 		})
-		if s.params.Monogamous {
-			s.monogamousMating(i)
-		} else {
-			s.nonMonogamousMating(i)
+		err := pairFunc(i)
+		if err != nil {
+			return err
 		}
 		s.genBdrys = append(s.genBdrys, len(s.agents))
-		s.setCurrGen(i + 1)
+		s.setCurrGen(i)
 	}
+	return nil
 }
 
 // Reports statistics on number of ancestors agents in the last generation have
@@ -466,7 +479,7 @@ func (s *Simulation) reportCommonAncestors() {
 	max_ := math.MinInt
 	for _, agent := range s.agents[start : len(s.agents)-1] {
 		for j := agent.id + 1; j < len(s.agents); j++ {
-			common := CountCommon(agent.ancestorVec, s.agents[j].ancestorVec)
+			common := CountCommonElementsSortedArray(agent.ancestorVec, s.agents[j].ancestorVec)
 			if common < min_ {
 				min_ = common
 			}
@@ -486,7 +499,7 @@ func (s *Simulation) reportCommonAncestors() {
 func (s *Simulation) reportGenDiff() {
 	lastGen := s.agents[len(s.agents)-1].generation
 	if lastGen == 0 {
-		fmt.Fprintf(os.Stderr, "s.id, rpt-gen-diff-err, only one generation\n")
+		fmt.Fprintf(os.Stderr, "s.id, rpt-generation-diff-err, only one generation\n")
 		return
 	}
 	count := 0
@@ -515,78 +528,75 @@ func (s *Simulation) reportGenDiff() {
 		}
 	}
 	avg := math.Round(float64(total) / (float64(count*count) / 2.0))
-	fmt.Printf("%d, rpt-gen-diff, gen diff last gen, min, %d, max, %d, mean %.1f\n", s.id, min_, max_, avg)
+	fmt.Printf("%d, rpt-generation-diff, generation-diff-last-gen, min, %d, max, %d, mean %.1f\n", s.id, min_, max_, avg)
 }
 
 // Reports statistics on gene distribution across a slice of agents
-func (s *Simulation) analyzeGenes(agents []Agent) {
+func (s *Simulation) analyzeGenes(agents []Agent) error {
 	geneTable := make(map[string]int)
 	individualTable := make(map[int]int)
 	for _, agent := range agents {
 		for _, gene := range agent.genes {
 			geneTable[gene]++
 			components := strings.Split(gene, "-")
-			individual, err1 := strconv.Atoi(components[0])
-			if err1 != nil {
-				fmt.Fprintf(os.Stderr, "%d, rpt-genes-err, error converting gene components to int", s.id)
-			} else {
-				individualTable[individual]++
+			individual, err := strconv.Atoi(components[0])
+			if err != nil {
+				return fmt.Errorf("%d, rpt-genes-err, error converting gene components to int", s.id)
 			}
+			individualTable[individual]++
 		}
 	}
 	generation := agents[0].generation
-	fmt.Printf("%d, rpt-genes, number different genes per generation, generation, %d, num genes, %d\n", s.id, generation, len(geneTable))
+	fmt.Printf("%d, rpt-genes, num-genes, generation, %d, num, %d\n", s.id, generation, len(geneTable))
 	maxGene, maxGeneCnt := "", 0
 	for k, v := range geneTable {
 		if v > maxGeneCnt {
 			maxGene, maxGeneCnt = k, v
 		}
 	}
-	fmt.Printf("%d, rpt-genes, most common gene, %s, count %d\n", s.id, maxGene, maxGeneCnt)
+	fmt.Printf("%d, rpt-genes, most-common-gene, %s, count, %d\n", s.id, maxGene, maxGeneCnt)
 	maxIndividual, maxIndividualCnt := 0, 0
 	for k, v := range individualTable {
 		if v > maxIndividualCnt {
 			maxIndividual, maxIndividualCnt = k, v
 		}
 	}
-	fmt.Printf("%d, rpt-genes, number of zero gen agents contributing to final gene pool, %d\n", s.id, len(individualTable))
-	fmt.Printf("%d, rpt-genes, most common agent, %d, count, %d\n", s.id, maxIndividual, maxIndividualCnt)
+	fmt.Printf("%d, rpt-genes, num-zero-agents, generation, %d, count, %d\n", s.id, generation, len(individualTable))
+	fmt.Printf("%d, rpt-genes, most-common-zero-agent, generation, %d, agent, %d, count, %d\n", s.id, generation, maxIndividual, maxIndividualCnt)
+	return nil
 }
 
+// Creates table of the number of each gene in the entire population
 // Reports gene statistics for a simulation
-func (s *Simulation) reportGenes() {
-	if len(s.agents) == 0 {
-		return
-	}
+func (s *Simulation) reportGenes(lastGenOnly bool) error {
 	start := 0
-	generation := s.agents[0].generation
-	for i, agent := range s.agents {
-		if agent.generation != generation {
-			s.analyzeGenes(s.agents[start:i])
-			start = i
-			generation = agent.generation
+	for _, end := range s.genBdrys {
+		if lastGenOnly == false || end == len(s.agents) {
+			err := s.analyzeGenes(s.agents[start:end])
+			if err != nil {
+				return err
+			}
 		}
+		start = end
 	}
-	s.analyzeGenes(s.agents[start:])
+
+	return nil
 }
 
 // Reports statistics on the outcome of a simulation
-func (s *Simulation) Analysis() {
-	fmt.Printf("For simulation %v:\n", s.id)
-	fmt.Printf("Parameters: %+v\n", s.params)
+func (s *Simulation) Analysis() error {
+	fmt.Printf("%d, Parameters: %+v\n", s.id, s.params)
 	if len(s.agents) == 0 {
-		fmt.Printf("No agents in simulation")
-		return
+		return errors.New("No agents in simulation")
 	}
 	generation := s.agents[len(s.agents)-1].generation
 	if generation == 0 {
-		fmt.Printf("Only zero generation exists")
-		return
+		return fmt.Errorf("%d, analysis-err, only zero generation exists", s.id)
 	}
 	s.setAncestorsGen(generation)
-
 	if strings.Contains(s.params.Analysis, "N") {
 		s.reportNumAncestors()
+
 	}
 
 	if strings.Contains(s.params.Analysis, "C") {
@@ -596,8 +606,11 @@ func (s *Simulation) Analysis() {
 	if strings.Contains(s.params.Analysis, "D") {
 		s.reportGenDiff()
 	}
-
 	if strings.Contains(s.params.Analysis, "G") {
-		s.reportGenes()
+		err := s.reportGenes(strings.Contains(s.params.Analysis, "g"))
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }

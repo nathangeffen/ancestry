@@ -37,14 +37,14 @@ type Parameters struct {
 func NewParameters() Parameters {
 	return Parameters{
 		SimulationId: 0,
-		NumAgents:    100,
-		Generations:  4,
-		GrowthRate:   1.01,
+		NumAgents:    2,
+		Generations:  32,
+		GrowthRate:   1.02,
 		Monogamous:   true,
 		MatingK:      50,
 		NumGenes:     10,
 		MutationRate: 0.0,
-		Compatible:   true,
+		Compatible:   false,
 		MateSelf:     false,
 		MateSibling:  false,
 		MateCousin:   false,

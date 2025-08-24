@@ -1,3 +1,5 @@
+# WORK IN PROGRESS - DON'T PLAY WITH THIS YET
+
 # Simulation of ancestry and genes
 
 Let's say an animal or plant  population starts off with two individuals. The

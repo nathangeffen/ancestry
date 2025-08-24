@@ -1,5 +1,3 @@
-# WORK IN PROGRESS - DON'T PLAY WITH THIS YET
-
 # Simulation of ancestry and genes
 
 Let's say an animal or plant  population starts off with two individuals. The
@@ -75,3 +73,13 @@ compatibility checks. For fastest, least complicated results set this to false.
 I'm not entirely satisfied yet with the way the simulation handles partner
 selection when compatibility is enforced.
 
+There are two matching algorithms. One assumes monogamous partnerships, i.e.
+given any agent, it has zero or more children with at most one other agent.
+This can be selected with the *-monog=true* command line parameter. This
+parameter defaults to false. I'm not entirely satisfied with the implementation
+of the monogamous algorithm and recommend that this parameter be left set to false.
+
+
+# Sample results
+
+TO DO

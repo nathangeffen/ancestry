@@ -29,7 +29,8 @@ func processFlags() (Parameters, int) {
 		`N - Number of ancestors
 C - Number of common ancestors
 D - Generation differences
-G - Gene analysis`)
+G - Gene analysis
+g - Only do gene analysis on last generation`)
 	numSims := 1
 	flag.IntVar(&numSims, "numsims", numSims, "Number of simulations to run (will be run in paralllel)")
 	flag.Parse()

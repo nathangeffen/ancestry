@@ -1,4 +1,4 @@
-# Experiments with evolution simulations 
+# Simulation of ancestry and genes
 
 Let's say an animal or plant  population starts off with two individuals. The
 parents die and children mate and produce four children. The four children and

@@ -40,7 +40,7 @@ func NewParameters() Parameters {
 		NumAgents:    2,
 		Generations:  32,
 		GrowthRate:   1.02,
-		Monogamous:   true,
+		Monogamous:   false,
 		MatingK:      50,
 		NumGenes:     10,
 		MutationRate: 0.0,

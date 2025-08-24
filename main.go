@@ -47,8 +47,12 @@ func main() {
 			p := parameters
 			p.SimulationId = parameters.SimulationId + i
 			simulation := NewSimulation(&p)
-			simulation.Simulate()
-			err := simulation.Analysis()
+			err := simulation.Simulate()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "%s\n", err)
+				return
+			}
+			err = simulation.Analysis()
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "%s\n", err)
 			}

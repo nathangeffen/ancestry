@@ -80,6 +80,7 @@ parameter defaults to false. I'm not entirely satisfied with the implementation
 of the monogamous algorithm and recommend that this parameter be left set to false.
 
 
-# Sample results
+## Sample results
 
 TO DO
+

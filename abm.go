@@ -434,8 +434,7 @@ func (s *Simulation) Simulate() error {
 		rand.Shuffle(len(s.currGen), func(x, y int) {
 			s.currGen[x], s.currGen[y] = s.currGen[y], s.currGen[x]
 		})
-		err := pairFunc(i)
-		if err != nil {
+		if err := pairFunc(i); err != nil {
 			return err
 		}
 		s.genBdrys = append(s.genBdrys, len(s.agents))
@@ -572,8 +571,7 @@ func (s *Simulation) reportGenes(lastGenOnly bool) error {
 	start := 0
 	for _, end := range s.genBdrys {
 		if lastGenOnly == false || end == len(s.agents) {
-			err := s.analyzeGenes(s.agents[start:end])
-			if err != nil {
+			if err := s.analyzeGenes(s.agents[start:end]); err != nil {
 				return err
 			}
 		}
@@ -607,8 +605,7 @@ func (s *Simulation) Analysis() error {
 		s.reportGenDiff()
 	}
 	if strings.Contains(s.params.Analysis, "G") {
-		err := s.reportGenes(strings.Contains(s.params.Analysis, "g"))
-		if err != nil {
+		if err := s.reportGenes(strings.Contains(s.params.Analysis, "g")); err != nil {
 			return err
 		}
 	}

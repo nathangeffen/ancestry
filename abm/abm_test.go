@@ -1,4 +1,4 @@
-package main
+package abm
 
 import (
 	//"fmt"
@@ -46,6 +46,7 @@ func TestSimpleSimOne(t *testing.T) {
 		NumAgents:    0,
 		Generations:  GENERATIONS,
 		GrowthRate:   1.0,
+		Strategy:     CEIL,
 		Monogamous:   false,
 		Compatible:   false,
 	}
@@ -61,6 +62,7 @@ func TestSimpleSimTwo(t *testing.T) {
 		NumAgents:    2,
 		Generations:  GENERATIONS,
 		GrowthRate:   1.0,
+		Strategy:     CEIL,
 		Monogamous:   false,
 		Compatible:   false,
 	}
@@ -78,6 +80,7 @@ func TestSimpleSimThree(t *testing.T) {
 		NumAgents:    2,
 		Generations:  GENERATIONS,
 		GrowthRate:   1.0,
+		Strategy:     CEIL,
 		Monogamous:   false,
 		Compatible:   false,
 	}
@@ -95,6 +98,7 @@ func TestSimpleSimFour(t *testing.T) {
 		NumAgents:    2,
 		Generations:  GENERATIONS,
 		GrowthRate:   1.0,
+		Strategy:     CEIL,
 		Monogamous:   false,
 		Compatible:   false,
 	}
@@ -112,6 +116,7 @@ func TestSimpleSimFive(t *testing.T) {
 		NumAgents:    2,
 		Generations:  GENERATIONS,
 		GrowthRate:   1.0,
+		Strategy:     CEIL,
 		Monogamous:   false,
 		Compatible:   false,
 	}
@@ -128,6 +133,7 @@ func TestSimpleSimSix(t *testing.T) {
 		SimulationId: 5,
 		NumAgents:    2,
 		Generations:  GENERATIONS,
+		Strategy:     CEIL,
 		GrowthRate:   2.0,
 		Monogamous:   false,
 		Compatible:   false,
@@ -157,6 +163,7 @@ func TestNonMonogMating(t *testing.T) {
 		NumAgents:    2,
 		Generations:  GENERATIONS,
 		GrowthRate:   2.0,
+		Strategy:     CEIL,
 		Monogamous:   false,
 		Compatible:   true,
 		MateSelf:     false,
@@ -181,6 +188,7 @@ func TestMonogMating(t *testing.T) {
 		NumAgents:    2,
 		Generations:  GENERATIONS,
 		GrowthRate:   2.0,
+		Strategy:     CEIL,
 		Monogamous:   true,
 		Compatible:   true,
 		MateSelf:     false,
@@ -205,6 +213,7 @@ func TestSetAncestorsGeneral(t *testing.T) {
 		NumAgents:    20,
 		Generations:  GENERATIONS,
 		GrowthRate:   1.01,
+		Strategy:     CEIL,
 		MatingK:      50,
 		Monogamous:   true,
 		Compatible:   false,

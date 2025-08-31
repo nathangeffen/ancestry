@@ -3,19 +3,22 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/nathangeffen/ancestry/abm"
 	"os"
 	"sync"
 )
 
 // Process the command line arguments and return values set in
 // parameters struct.
-func processFlags() (Parameters, int) {
-	params := NewParameters()
-	var p Parameters
+func processFlags() (abm.Parameters, int) {
+	params := abm.NewParameters()
+	var p abm.Parameters
+	p.Strategy = params.Strategy
 	flag.IntVar(&p.SimulationId, "id", params.SimulationId, "Id of simulation")
 	flag.IntVar(&p.NumAgents, "agents", params.NumAgents, "Number of agents")
 	flag.IntVar(&p.Generations, "generations", params.Generations, "Number of generations to run for")
 	flag.Float64Var(&p.GrowthRate, "growth", params.GrowthRate, "Growth rate of population")
+	flag.Var(&p.Strategy, "strat", "Growth strategy (random, floor, ceil, round")
 	flag.BoolVar(&p.Monogamous, "monog", params.Monogamous, "Agents are monogamous")
 	flag.IntVar(&p.MatingK, "matingk", params.MatingK, "Number of agents to search for compatible match")
 	flag.BoolVar(&p.Compatible, "compatible", params.Compatible, "Switch off all mating compatibility checks if false")
@@ -46,7 +49,7 @@ func main() {
 			defer wg.Done()
 			p := parameters
 			p.SimulationId = parameters.SimulationId + i
-			simulation := NewSimulation(&p)
+			simulation := abm.NewSimulation(&p)
 			if err := simulation.Simulate(); err != nil {
 				fmt.Fprintf(os.Stderr, "%s\n", err)
 				return

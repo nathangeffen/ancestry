@@ -1,7 +1,7 @@
-// Package implements an agent based model to simulate population growth
+//  Implementation of an agent based model to simulate popuulation growth
 // over generations in order to increase understanding of ancestry and inheritance.
 
-package main
+package abm
 
 import (
 	"cmp"
@@ -15,12 +15,44 @@ import (
 	"strings"
 )
 
+type GrowthStrategy string
+
+const (
+	RANDOM GrowthStrategy = "Random"
+	FLOOR  GrowthStrategy = "Floor"
+	CEIL   GrowthStrategy = "Ceil"
+	ROUND  GrowthStrategy = "Round"
+)
+
+// String implements the flag.Value interface
+func (g *GrowthStrategy) String() string {
+	return string(*g)
+}
+
+// Implement Set on flag.Set interface
+func (g *GrowthStrategy) Set(value string) error {
+	switch strings.ToLower(value) {
+	case "random":
+		*g = RANDOM
+	case "floor":
+		*g = FLOOR
+	case "ceil":
+		*g = CEIL
+	case "round":
+		*g = ROUND
+	default:
+		return fmt.Errorf("invalid growth strategy: %s (valid options: random, floor, ceil, round)", value)
+	}
+	return nil
+}
+
 // These can be set on the command line
 type Parameters struct {
 	SimulationId int
 	NumAgents    int
 	Generations  int
 	GrowthRate   float64
+	Strategy     GrowthStrategy
 	Monogamous   bool
 	MatingK      int
 	NumGenes     int
@@ -40,6 +72,7 @@ func NewParameters() Parameters {
 		NumAgents:    2,
 		Generations:  32,
 		GrowthRate:   1.02,
+		Strategy:     RANDOM,
 		Monogamous:   false,
 		MatingK:      50,
 		NumGenes:     10,
@@ -337,9 +370,26 @@ func newChild(agents []Agent, father, mother, numGenes, generation int, mutation
 	return agents
 }
 
+// Calculate the number of children to in this generation
+func (s *Simulation) calcNumChildrenForGeneration() int {
+	switch s.params.Strategy {
+	case RANDOM:
+		if rand.Float64() < 0.5 {
+			return int(math.Floor(s.params.GrowthRate * float64(len(s.currGen))))
+		}
+		return int(math.Ceil(s.params.GrowthRate * float64(len(s.currGen))))
+	case FLOOR:
+		return int(math.Floor(s.params.GrowthRate * float64(len(s.currGen))))
+	case CEIL:
+		return int(math.Ceil(s.params.GrowthRate * float64(len(s.currGen))))
+	default:
+		return int(math.Round(s.params.GrowthRate * float64(len(s.currGen))))
+	}
+}
+
 // Makes children agents from the mating_pairs vector
 func (s *Simulation) makeChildrenMonogamous(generation int) {
-	iterations := int(math.Ceil(s.params.GrowthRate * float64(len(s.currGen))))
+	iterations := s.calcNumChildrenForGeneration()
 	for range iterations {
 		pair := s.matingPairs[rand.Intn(len(s.matingPairs))]
 		s.agents = newChild(s.agents, pair.male, pair.female, s.params.NumGenes, generation, s.params.MutationRate)
@@ -360,7 +410,7 @@ func (s *Simulation) monogamousMating(generation int) error {
 // Mating strategy in which agents to mate are repeatedly selected to mate with
 // anyone but compatibility checking is done.
 func (s *Simulation) nonMonogamousMating(generation int) error {
-	iterations := int(math.Ceil(s.params.GrowthRate * float64(len(s.currGen))))
+	iterations := s.calcNumChildrenForGeneration()
 	for range iterations {
 		i := s.currGen[rand.Intn(len(s.currGen))].id
 		var j int
@@ -381,7 +431,7 @@ func (s *Simulation) nonMonogamousMating(generation int) error {
 
 // Mating strategy in which no compatibility checks are done (fastest)
 func (s *Simulation) anyMating(generation int) error {
-	iterations := int(math.Ceil(s.params.GrowthRate * float64(len(s.currGen))))
+	iterations := s.calcNumChildrenForGeneration()
 	for range iterations {
 		i := s.currGen[rand.Intn(len(s.currGen))].id
 		j := s.currGen[rand.Intn(len(s.currGen))].id
